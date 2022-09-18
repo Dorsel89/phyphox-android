@@ -26,6 +26,7 @@ import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.SeekBar;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -1058,7 +1059,174 @@ public class ExpView implements Serializable{
                     "</div>";
         }
     }
+    //sliderElement
+    public class sliderElement extends expViewElement implements Serializable {
+        transient SeekBar sb = null;
+        private Vector<String> triggers = null;
+        private boolean triggered = false;
+        private ExpViewFragment parent;
+        private double currentValue = Double.NaN;
+        private int min = 0;
+        private int max = 100;
+        private int stepSize = 1;
+        private double defaultValue;
+        private boolean focused = false;
 
+        //values can be changed dynamically or afterwards
+        private boolean changeDynamically = true;
+
+        //No special constructor.
+        sliderElement(String label, String valueOutput, Vector<String> inputs, Resources res) {
+            super(label, valueOutput, inputs, res);
+        }
+
+        protected void setTriggers(Vector<String> triggers) {
+            this.triggers = triggers;
+        }
+
+        protected void setStepSize(int stepSize) {
+            this.stepSize = stepSize;
+        }
+
+        protected void setDefaultValue(double v) {
+            this.defaultValue = v;
+        }
+
+        protected void setRange(int min, int max) {
+            this.min = min;
+            this.max = max;
+        }
+
+        @Override
+        //This is an input, so the updateMode should be "input"
+        protected String getUpdateMode() {
+            return "input";
+        }
+
+        @Override
+        //Create the view in Android and append it to the linear layout
+        protected void createView(LinearLayout ll, Context c, Resources res, ExpViewFragment parent, PhyphoxExperiment experiment){
+            super.createView(ll, c, res, parent, experiment);
+            //The slider
+            sb = new SeekBar(c);
+
+            LinearLayout.LayoutParams vglp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.FILL_PARENT , LinearLayout.LayoutParams.WRAP_CONTENT);
+            vglp.gravity = Gravity.CENTER;
+
+            sb.setLayoutParams(vglp);
+            sb.setProgress((int)defaultValue);
+            sb.incrementProgressBy(stepSize);
+            sb.setMax(min);
+            sb.setMax(max);
+            //Add the button to the main linear layout passed to this function
+            rootView = sb;
+            ll.addView(rootView);
+
+            sb.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+                public void onFocusChange(View v, boolean hasFocus) {
+                    focused = hasFocus;
+                    if (!hasFocus) {
+                        setValue(getValue()); //Write back the value actually used...
+                        triggered = true;
+                    }
+                }
+            });
+
+            //Add a listener to the button to get the trigger
+            sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                @Override
+                public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                    if(changeDynamically){
+                        trigger();
+                    }
+                }
+
+                @Override
+                public void onStartTrackingTouch(SeekBar seekBar) {
+                    //do nothing
+                }
+
+                @Override
+                public void onStopTrackingTouch(SeekBar seekBar) {
+                    if(!changeDynamically){
+                        trigger();
+                    }
+                }
+            });
+        }
+
+        @Override
+        protected void trigger() {
+            triggered = true;
+        }
+
+
+        @Override
+        //If triggered, write the data to the output buffers
+        //Always return zero as the analysis process does not receive the values directly
+        protected boolean onMayWriteToBuffers(PhyphoxExperiment experiment) {
+            if (!triggered)
+                return false;
+            triggered = false;
+            experiment.getBuffer(inputs.get(0)).append(getValue());
+            return true;
+        }
+
+        @Override
+        //Set the value if the element is not focused
+        protected void onMayReadFromBuffers(PhyphoxExperiment experiment) {
+            //Enter value from buffer if it has not been changed by the user
+            //This ensures, that the old value is restored if the view has to be created after the views have been switched.
+            double v = experiment.getBuffer(inputs.get(0)).value;
+            setValue(v);
+        }
+
+        void setValue(double v) {
+            if (!focused) {
+                if (Double.isNaN(v)) //If the buffer holds NaN, resort to the default value (probably the user has not entered anything yet)
+                    currentValue = defaultValue;
+                else
+                    currentValue = v;
+                if (sb != null) {
+                    sb.setProgress((int)currentValue);
+                }
+            }
+        }
+
+        protected double getValue(){
+            if (sb == null || focused){
+                return currentValue;
+            }
+            try {
+                currentValue = Double.valueOf(sb.getProgress());
+                if (currentValue < min) {
+                    currentValue = min;
+                }
+                if (currentValue > max) {
+                    currentValue = max;
+                }
+            } catch (Exception e) {
+                return currentValue;
+            }
+            return currentValue;
+        }
+
+        @Override
+        //Create the HTML markup for this element
+        //<div>
+        //  <span>Label</span> <input /> <span>unit</span>
+        //</div>
+        //Note that the input is send from here as well as the AJAX-request is placed in the
+        //onchange-listener in the markup
+        protected String createViewHTML(){
+            return "";
+            /*return "<div style=\"font-size:"+this.labelSize/.4+"%;\" class=\"buttonElement\" id=\"element"+htmlID+"\">" +
+                    "<button onclick=\"ajax('control?cmd=trigger&element="+htmlID+"');\">" + this.label +"</button>" +
+                    "</div>";
+
+             */
+        }
+    }
     //graphElement implements a graph that displays y vs. x arrays from the dataBuffer
     //This class mostly wraps the graphView, which (being rather complex) is implemented in its own
     //class. See graphView.java...

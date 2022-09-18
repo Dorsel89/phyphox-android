@@ -1558,6 +1558,28 @@ public abstract class PhyphoxFile {
                     newView.elements.add(be);
                     break;
                 }
+                case "slider": {
+                    boolean signed = getBooleanAttribute("changeDynamically", false);
+
+                    double defaultValue = getDoubleAttribute("default", 0.);
+                    int stepSize = getIntAttribute("stepSize", 1);
+
+                    int min = getIntAttribute("min", 0);
+                    int max = getIntAttribute("max", 100);
+
+                    //Allowed input/output configuration
+                    ioBlockParser.ioMapping[] outputMapping = {
+                            new ioBlockParser.ioMapping() {{name = "out"; asRequired = false; minCount = 1; maxCount = 1; }}
+                    };
+                    (new ioBlockParser(xpp, experiment, parent, null, outputs, null, outputMapping, null)).process(); //Load inputs and outputs
+
+                    ExpView.sliderElement se = newView.new sliderElement(label, outputs.get(0).buffer.name, null, parent.getResources()); //Output only
+                    se.setStepSize(stepSize); //A unit displayed next to the input box
+                    se.setRange(min,max);
+
+                    newView.elements.add(se);
+                    break;
+                }
                 case "depth-gui": //GUI for the depth input (LiDAR/ToF)
                     double aspectRatio = getDoubleAttribute("aspectRatio", 2.5);
                     ExpView.depthGuiElement dge = newView.new depthGuiElement(label, null, null, parent.getResources()); //Two array inputs
