@@ -1548,6 +1548,27 @@ public abstract class PhyphoxFile {
                     newView.elements.add(ie);
                     break;
                 }
+                case "slider": { //The edit element can take input from the user
+                    double defaultValue = getDoubleAttribute("default", 0.);
+
+                    double min = getDoubleAttribute("min", 0f);
+                    double max = getDoubleAttribute("max", 100f);
+
+                    //Allowed input/output configuration
+                    ioBlockParser.ioMapping[] outputMapping = {
+                            new ioBlockParser.ioMapping() {{name = "out"; asRequired = false; minCount = 1; maxCount = 1; }}
+                    };
+                    (new ioBlockParser(xpp, experiment, parent, null, outputs, null, outputMapping, null)).process(); //Load inputs and outputs
+
+                    ExpView.sliderElement is = newView.new sliderElement(label, outputs.get(0).buffer.name, null, parent.getResources());
+                    is.setFactor(factor); //A scaling factor. Mostly for matching units
+                    is.setDefaultValue((float)defaultValue); //Default value before the user entered anything
+                    is.setMinValue((float)min);
+                    is.setMaxValue((float)max);
+                    is.setUnit(unit);
+                    newView.elements.add(is);
+                    break;
+                }
                 case "button": { //The edit element can take input from the user
                     //Allowed input/output configuration
                     Vector<ioBlockParser.AdditionalTag> ats = new Vector<>();

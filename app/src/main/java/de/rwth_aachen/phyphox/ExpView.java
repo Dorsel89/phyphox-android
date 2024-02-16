@@ -3,6 +3,8 @@ package de.rwth_aachen.phyphox;
 import static android.view.View.INVISIBLE;
 import static android.view.View.VISIBLE;
 
+import static androidx.appcompat.content.res.AppCompatResources.getColorStateList;
+
 import android.app.Activity;
 import android.content.Context;
 import android.content.ContextWrapper;
@@ -25,6 +27,7 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
@@ -32,8 +35,17 @@ import android.widget.Spinner;
 import android.widget.TableRow;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
+import androidx.appcompat.view.ContextThemeWrapper;
 import androidx.appcompat.widget.AppCompatEditText;
+import androidx.core.content.ContextCompat;
 import androidx.core.view.ViewCompat;
+
+import com.google.android.material.resources.MaterialResources;
+import com.google.android.material.slider.LabelFormatter;
+import com.google.android.material.slider.Slider;
+
+import org.w3c.dom.Text;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -636,6 +648,155 @@ public class ExpView implements Serializable{
                     "</div>";
         }
 
+    }
+    //sliderElement implements a simple slider
+    public class sliderElement extends expViewElement {
+        transient Slider s = null;
+        private double factor;
+        private float defaultValue; //This value is filled into the dataBuffer before the user enters a custom value
+        private float currentValue = Float.NaN; //This value is filled into the dataBuffer before the user enters a custom value
+        private boolean decimal = true; //Is the user allowed to give non-integer values?
+        private float min = 0f;
+        private float max = 100f;
+
+        private float stepSize = 1f;
+
+        private boolean changeOnRelease = false;
+        //private boolean triggered = true;
+        sliderElement(String label, String valueOutput, Vector<String> inputs, Resources res) {
+            super(label, valueOutput, inputs, res);
+            this.factor = 1.;
+            this.defaultValue =0f;
+        }
+
+        protected void setFactor(double factor) {
+            this.factor = factor;
+        }
+        protected void setDefaultValue(float v) {
+            this.defaultValue = v;
+        }
+        protected void setMinValue(float v) {
+            this.min = v;
+        }
+
+        protected void setMaxValue(float v) {
+            this.max = v;
+        }
+        private String unit;
+
+        protected void setUnit(String unit) {
+            //If there is a unit we will save the space in this string as well...
+            if (unit == null || unit.equals(""))
+                this.unit = "";
+            else
+                this.unit = " "+unit;
+        }
+
+        protected void createView(LinearLayout ll, final Context c, Resources res, ExpViewFragment parent, PhyphoxExperiment experiment) {
+            super.createView(ll, c, res, parent, experiment);
+            //Create a row holding the label and the textEdit
+
+            LinearLayout row = new LinearLayout(c);
+            row.setLayoutParams(new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT));
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setVerticalGravity(Gravity.CENTER_VERTICAL);
+
+            //The slider
+
+            Context myWrapper = new ContextThemeWrapper(c, R.style.Theme_MaterialComponents_DayNight_NoActionBar);
+            s = new Slider(myWrapper){
+                //TODO?
+            };
+
+            s.setValue(defaultValue);
+            s.setStepSize(stepSize);
+            s.setValueFrom(min);
+            s.setValueTo(max);
+
+            s.setThumbTintList(getColorStateList(myWrapper, R.color.phyphox_primary));
+
+            s.setTrackTintList(getColorStateList(myWrapper, R.color.cardview_shadow_start_color));
+            s.setTrackActiveTintList(getColorStateList(myWrapper, R.color.phyphox_primary));
+            s.setTickTintList(getColorStateList(myWrapper, R.color.phyphox_primary)); //all dots
+
+            //label
+            s.setLabelFormatter(new LabelFormatter() {
+                @NonNull
+                @Override
+                public String getFormattedValue(float value) {
+                    StringBuilder  s = new StringBuilder();
+                    s.append(String.valueOf(value));
+                    s.append(unit);
+                    return s.toString();
+                }
+            });
+
+            row.addView(s);
+
+            rootView = row;
+            ll.addView(rootView);
+
+            //add listener to slider
+            s.addOnChangeListener(new Slider.OnChangeListener() {
+                @Override
+                public void onValueChange(@NonNull Slider slider, float value, boolean fromUser) {
+                    getValue();
+                }
+            });
+        }
+        @Override
+        //This is an input, so the updateMode should be "input"
+        protected String getUpdateMode() {
+            return "input";
+        }
+        protected String createViewHTML(){
+            //TODO
+
+            return "<div style=\"font-size:"+this.labelSize/.4+"%;background: #"+";height: "+"em\" class=\"separatorElement adjustableColor\" id=\"element"+htmlID+"\">" +
+                    "</div>";
+        }
+        @Override
+        //If triggered, write the data to the output buffers
+        //Always return zero as the analysis process does not receive the values directly
+        protected boolean onMayWriteToBuffers(PhyphoxExperiment experiment) {
+            experiment.getBuffer(inputs.get(0)).clear(false);
+            experiment.getBuffer(inputs.get(0)).append(currentValue);
+            return true;
+        }
+        @Override
+        //Get the value from the edit box (Note, that we have to divide by the factor to achieve a
+        //use that is consistent with that of the valueElement
+        protected double getValue() {
+            if (s == null )
+                return currentValue;
+            try {
+                currentValue = (float)s.getValue()/(float)factor;
+
+            } catch (Exception e) {
+                return currentValue;
+            }
+            return currentValue;
+        }
+
+        void setValue(float v) {
+            if (Float.isNaN(v)) //If the buffer holds NaN, resort to the default value (probably the user has not entered anything yet)
+                currentValue = defaultValue;
+            else
+                currentValue = v;
+            if (s != null) {
+                s.setValue(currentValue * (float)factor);
+            }
+        }
+        @Override
+        //Set the value if the element is not focused
+        protected void onMayReadFromBuffers(PhyphoxExperiment experiment) {
+            //Enter value from buffer if it has not been changed by the user
+            //This ensures, that the old value is restored if the view has to be created after the views have been switched.
+            double v = experiment.getBuffer(inputs.get(0)).value;
+            setValue((float)v);
+        }
     }
 
     //editElement implements a simple edit box which takes a single value from the user
