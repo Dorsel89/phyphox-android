@@ -2,6 +2,7 @@ package de.rwth_aachen.phyphox;
 
 import java.io.Serializable;
 import java.util.Iterator;
+import java.util.Vector;
 
 //dataOutput wraps all data-containers (currently only dataBuffer) as possible outputs.
 //Also allowing to store additional parameters (like clearing the buffer before filling it)
@@ -29,6 +30,11 @@ public class DataOutput implements Serializable {
     //Retrieve the iterator of the BlockingQueue
     public Iterator getIterator() {
         return buffer.getIterator();
+    }
+
+    //Get all buffer names
+    public Vector<String> getBufferNames() {
+        return buffer.getBufferNames();
     }
 
     //Get all values as a double array

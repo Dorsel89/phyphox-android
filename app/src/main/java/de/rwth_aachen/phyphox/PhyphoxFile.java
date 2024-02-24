@@ -1569,6 +1569,33 @@ public abstract class PhyphoxFile {
                     newView.elements.add(is);
                     break;
                 }
+                case "rangeslider": { //The edit element can take input from the user
+
+                    double min = getDoubleAttribute("min", 0f);
+                    double max = getDoubleAttribute("max", 100f);
+
+                    double defaultValue1 = getDoubleAttribute("defaut_start", min);
+                    double defaultValue2 = getDoubleAttribute("default_end", max);
+
+
+                    //Allowed input/output configuration
+                    ioBlockParser.ioMapping[] outputMapping = {
+                            new ioBlockParser.ioMapping() {{name = "out"; asRequired = false; minCount = 1; maxCount = 0;repeatableOffset=0; }}
+                    };
+                    (new ioBlockParser(xpp, experiment, parent, null, outputs, null, outputMapping, "as")).process(); //Load inputs and outputs
+
+                    ExpView.rangeSliderElement irs = newView.new rangeSliderElement(label,null,null,parent.getResources());
+                            //rangeSliderElement(label, null, null, parent.getResources());
+                    irs.setIO(inputs,outputs);
+                    irs.setFactor(factor); //A scaling factor. Mostly for matching units
+                    irs.setDefaultValues((float)defaultValue1, (float)defaultValue2); //Default value before the user entered anything
+                    irs.setMinValue((float)min);
+                    irs.setMaxValue((float)max);
+                    irs.setUnit(unit);
+                    newView.elements.add(irs);
+
+                    break;
+                }
                 case "button": { //The edit element can take input from the user
                     //Allowed input/output configuration
                     Vector<ioBlockParser.AdditionalTag> ats = new Vector<>();

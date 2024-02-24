@@ -43,6 +43,7 @@ import androidx.core.view.ViewCompat;
 
 import com.google.android.material.resources.MaterialResources;
 import com.google.android.material.slider.LabelFormatter;
+import com.google.android.material.slider.RangeSlider;
 import com.google.android.material.slider.Slider;
 
 import org.w3c.dom.Text;
@@ -88,6 +89,7 @@ public class ExpView implements Serializable{
         protected String label; //Each element has a label. Usually naming the data shown
         protected float labelSize; //Size of the label
         protected String valueOutput; //User input will be directed to this output, so the experiment can write it to a dataBuffer
+        protected Vector<String> valueOutputs; //added for elements with multiple outputs like a range slider
         protected Vector<String> inputs;
         protected boolean needsUpdate = true;
 
@@ -112,6 +114,20 @@ public class ExpView implements Serializable{
             }
         }
 
+        protected expViewElement(String label, Vector<String> valueOutputs, Vector<String> inputs, Resources res) {
+            this.label = label;
+            this.labelSize = res.getDimension(R.dimen.label_font);
+            this.valueOutputs = valueOutputs;
+            this.inputs = inputs;
+
+            //If not set otherwise, set the input buffer to be identical to the output buffer
+            //This allows to receive the old user-set value after the view has changed
+            if (this.inputs == null && this.valueOutputs != null) {
+                //TODO - loop over multiple outputs?
+                this.inputs = new Vector<>();
+                this.inputs.add(this.getValueOutput());
+            }
+        }
         //Called when one of the input buffers is updated
         public void notifyUpdate(boolean clear, boolean reset) {
             if (reset) {
@@ -799,6 +815,212 @@ public class ExpView implements Serializable{
         }
     }
 
+    //rangeSliderElement implements a rangeSlider
+    public class rangeSliderElement extends expViewElement {
+        private Vector<DataInput> inputs = null;
+        private Vector<DataOutput> outputs = null;
+        transient RangeSlider rs = null;
+        private double factor;
+        private float defaultValue1;
+        private float defaultValue2;
+        private float currentValue1 = Float.NaN; //This value is filled into the dataBuffer before the user enters a custom value
+        private float currentValue2 = Float.NaN;
+        private boolean decimal = true; //Is the user allowed to give non-integer values?
+        private float min = 0f;
+        private float max = 100f;
+
+        private float stepSize = 1f;
+
+        private boolean changeOnRelease = false;
+        //private boolean triggered = true;
+
+        rangeSliderElement(String label, Vector<String> valueOutputs, Vector<String> inputs, Resources res) {
+            //super(label, outputs, inputs, res);
+            super(label, valueOutputs, inputs, res);
+            this.factor = 1.;
+            this.defaultValue1 =min;
+            this.defaultValue2 =max;
+        }
+
+
+        protected void setIO(Vector<DataInput> inputs, Vector<DataOutput> outputs) {
+            this.inputs = inputs;
+            this.outputs = outputs;
+        }
+
+        protected void setFactor(double factor) {
+            this.factor = factor;
+        }
+        protected void setDefaultValues(float v1, float v2) {
+            this.defaultValue1 = v1;
+            this.defaultValue2 = v2;
+        }
+        protected void setMinValue(float v) {
+            this.min = v;
+        }
+
+        protected void setMaxValue(float v) {
+            this.max = v;
+        }
+        private String unit;
+
+        protected void setUnit(String unit) {
+            //If there is a unit we will save the space in this string as well...
+            if (unit == null || unit.equals(""))
+                this.unit = "";
+            else
+                this.unit = " "+unit;
+        }
+
+        protected void createView(LinearLayout ll, final Context c, Resources res, ExpViewFragment parent, PhyphoxExperiment experiment) {
+            super.createView(ll, c, res, parent, experiment);
+            //Create a row holding the label and the textEdit
+
+            LinearLayout row = new LinearLayout(c);
+            row.setLayoutParams(new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT));
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setVerticalGravity(Gravity.CENTER_VERTICAL);
+
+            //The slider
+
+            Context myWrapper = new ContextThemeWrapper(c, R.style.Theme_MaterialComponents_DayNight_NoActionBar);
+            rs = new RangeSlider(myWrapper){
+                //TODO?
+            };
+
+            rs.setValues(min,max);
+            rs.setStepSize(stepSize);
+            rs.setValueFrom(min);
+            rs.setValueTo(max);
+
+            rs.setThumbTintList(getColorStateList(myWrapper, R.color.phyphox_primary));
+
+            rs.setTrackTintList(getColorStateList(myWrapper, R.color.cardview_shadow_start_color));
+            rs.setTrackActiveTintList(getColorStateList(myWrapper, R.color.phyphox_primary));
+            rs.setTickTintList(getColorStateList(myWrapper, R.color.phyphox_primary)); //all dots
+
+            //label
+            rs.setLabelFormatter(new LabelFormatter() {
+                @NonNull
+                @Override
+                public String getFormattedValue(float value) {
+                    StringBuilder  s = new StringBuilder();
+                    s.append(String.valueOf(value));
+                    s.append(unit);
+                    return s.toString();
+                }
+            });
+
+            row.addView(rs);
+
+            rootView = row;
+            ll.addView(rootView);
+
+            //add listener to rangeSlider
+
+            rs.addOnChangeListener(new RangeSlider.OnChangeListener() {
+                @Override
+                public void onValueChange(@NonNull RangeSlider slider, float value, boolean fromUser) {
+                    getValue();
+                }
+            });
+        }
+        @Override
+        //This is an input, so the updateMode should be "input"
+        protected String getUpdateMode() {
+            return "input";
+        }
+        protected String createViewHTML(){
+            //TODO
+
+            return "<div style=\"font-size:"+this.labelSize/.4+"%;background: #"+";height: "+"em\" class=\"separatorElement adjustableColor\" id=\"element"+htmlID+"\">" +
+                    "</div>";
+        }
+        /*
+        @Override
+        //If triggered, write the data to the output buffers
+        //Always return zero as the analysis process does not receive the values directly
+        protected boolean onMayWriteToBuffers(PhyphoxExperiment experiment) {
+            //for (int i=0;i<outputs.size();i++){
+            experiment.getBuffer(outputs.get(0).toString()).append((double)currentValue1);
+            experiment.getBuffer(outputs.get(1).toString()).append((double)currentValue2);
+            //}
+            return true;
+        }
+        */
+/*
+        protected float[] getValue() {
+            float[] values = new float[2];
+            if (rs == null ) {
+                values[0] = currentValue1;
+                values[1] = currentValue2;
+                return values;
+            }
+            try {
+                List<Float> myList;
+                myList = rs.getValues();
+                currentValue1 = myList.get(0) /(float)factor;
+                currentValue2 = myList.get(1) /(float)factor;
+            } catch (Exception e) {
+                return values;
+            }
+            return values;
+        }
+        */
+
+        //TODOOO
+
+        @Override
+        //If triggered, write the data to the output buffers
+        //Always return zero as the analysis process does not receive the values directly
+        protected boolean onMayWriteToBuffers(PhyphoxExperiment experiment) {
+            experiment.getBuffer(inputs.get(0).toString()).append((double)currentValue1);
+            experiment.getBuffer(inputs.get(1).toString()).append((double)currentValue2);
+            return true;
+        }
+        @Override
+        //Get the value from the edit box (Note, that we have to divide by the factor to achieve a
+        //use that is consistent with that of the valueElement
+        protected double getValue() {
+            if (rs == null )
+                return currentValue1;
+            try {
+                List<Float> myList;
+                myList = rs.getValues();
+                currentValue1 = myList.get(0)/(float)factor;
+                currentValue2 = myList.get(1)/(float)factor;
+
+            } catch (Exception e) {
+                return currentValue1;
+            }
+            return currentValue1;
+        }
+
+        void setValues(float v1, float v2) {
+            if (Float.isNaN(v1) && Float.isNaN(v2)) {
+                currentValue1 = defaultValue1;
+                currentValue2 = defaultValue2;
+            }
+            else
+                currentValue1 = v1;
+                currentValue2 = v2;
+            if (rs != null) {
+                rs.setValues(currentValue1 * (float)factor, currentValue2 * (float)factor);
+            }
+        }
+        @Override
+        //Set the value if the element is not focused
+        protected void onMayReadFromBuffers(PhyphoxExperiment experiment) {
+            /*
+            double[] data = new double[inputs.size()];
+            for (int i = 0; i < inputs.size(); i++){
+                data[i] = experiment.getBuffer(inputs.get(i)).value;
+            }
+            */
+        }
+    }
     //editElement implements a simple edit box which takes a single value from the user
     public class editElement extends expViewElement implements Serializable {
         transient EditText et = null;

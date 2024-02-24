@@ -15,6 +15,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+import java.util.Vector;
 
 //Databuffer class
 //Each databuffer can be identified by a name (mapped in phyphoxExperiment class)
@@ -523,6 +524,16 @@ public class DataBuffer implements Serializable {
             i++;
         }
         return ret;
+    }
+
+    //Get all values as a short array. The data will be scaled so that (-/+)1 matches (-/+)Short.MAX_VALUE, used for audio data
+    public Vector<String> getBufferNames() {
+
+        Vector<String> myList = new Vector<>();
+        for (int i =0; i<buffer.size();i++){
+            myList.add(buffer.get(i).toString());
+        }
+        return myList;
     }
 
     public DataBuffer copy() {
