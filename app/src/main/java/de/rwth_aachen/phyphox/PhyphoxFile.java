@@ -1569,6 +1569,24 @@ public abstract class PhyphoxFile {
                     newView.elements.add(is);
                     break;
                 }
+                case "switch": {
+                    //Allowed input/output configuration
+                    Vector<ioBlockParser.AdditionalTag> ats = new Vector<>();
+                    ioBlockParser.ioMapping[] inputMapping = {
+                            new ioBlockParser.ioMapping() {{name = "true"; asRequired = false; minCount = 0; maxCount = 1; valueAllowed = true; emptyAllowed = true; repeatableOffset = 0;}},
+                            new ioBlockParser.ioMapping() {{name = "false"; asRequired = false; minCount = 0; maxCount = 1; valueAllowed = true; emptyAllowed = true; repeatableOffset = 0;}},
+                    };
+                    ioBlockParser.ioMapping[] outputMapping = {
+                            new ioBlockParser.ioMapping() {{name = "out"; asRequired = false; minCount = 0; maxCount = 0; repeatableOffset = 0;}}
+                    };
+                    (new ioBlockParser(xpp, experiment, parent, inputs, outputs, inputMapping, outputMapping, "as")).process(); //Load inputs and outputs
+
+                    ExpView.switchElement se = newView.new switchElement(label, null, null, parent.getResources()); //This one is user-event driven and does not regularly read or write values
+                    se.setIO(inputs, outputs);
+
+                    newView.elements.add(se);
+                    break;
+                }
                 case "rangeslider": { //The edit element can take input from the user
 
                     double min = getDoubleAttribute("min", 0f);

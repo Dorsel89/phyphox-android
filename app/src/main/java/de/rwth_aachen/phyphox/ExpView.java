@@ -8,6 +8,8 @@ import static androidx.appcompat.content.res.AppCompatResources.getColorStateLis
 import android.app.Activity;
 import android.content.Context;
 import android.content.ContextWrapper;
+import android.content.DialogInterface;
+import android.content.res.ColorStateList;
 import android.content.res.Resources;
 import android.graphics.Rect;
 import android.graphics.Typeface;
@@ -38,9 +40,11 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.appcompat.view.ContextThemeWrapper;
 import androidx.appcompat.widget.AppCompatEditText;
+import androidx.appcompat.widget.SwitchCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.ViewCompat;
 
+import com.google.android.material.materialswitch.MaterialSwitch;
 import com.google.android.material.resources.MaterialResources;
 import com.google.android.material.slider.LabelFormatter;
 import com.google.android.material.slider.RangeSlider;
@@ -1431,6 +1435,111 @@ public class ExpView implements Serializable{
         protected String createViewHTML(){
             return "<div style=\"font-size:"+this.labelSize/.4+"%;\" class=\"buttonElement\" id=\"element"+htmlID+"\">" +
                     "<button onclick=\"ajax('control?cmd=trigger&element="+htmlID+"');\">" + this.label +"</button>" +
+                    "</div>";
+        }
+    }
+
+    //switchElement implements a simple checkbox which writes values from inputs to outputs depending on the switch value
+    public class switchElement extends expViewElement{
+        private Vector<DataInput> inputs = null;
+        private Vector<DataOutput> outputs = null;
+        private Vector<String> triggers = null;
+        private ExpViewFragment parent;
+
+        private  boolean switchState;
+        //No special constructor.
+        switchElement(String label, String valueOutput, Vector<String> inputs, Resources res) {
+            super(label, valueOutput, inputs, res);
+            switchState=true;
+        }
+
+        protected void setIO(Vector<DataInput> inputs, Vector<DataOutput> outputs) {
+            this.inputs = inputs;
+            this.outputs = outputs;
+        }
+
+        @Override
+        protected String getUpdateMode() {
+            return "inputs";
+        }
+
+        @Override
+        //Create the view in Android and append it to the linear layout
+        protected void createView(LinearLayout ll, Context c, Resources res, ExpViewFragment parent, PhyphoxExperiment experiment){
+            super.createView(ll, c, res, parent, experiment);
+
+
+            //this.parent =parent;
+
+            //The switch
+            Context myWrapper = new ContextThemeWrapper(c, R.style.Theme_Material3_DayNight_NoActionBar);//Theme_MaterialComponents_DayNight_NoActionBar
+
+            MaterialSwitch s = new MaterialSwitch(myWrapper){
+                //TODO?
+            };
+            s.setChecked(true);
+
+
+            s.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    switchState = s.isChecked();
+                }
+            });
+
+            LinearLayout row = new LinearLayout(myWrapper);
+            row.setLayoutParams(new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT));
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setVerticalGravity(Gravity.CENTER_VERTICAL);
+
+            TextView labelView = new TextView(c);
+            labelView.setLayoutParams(new TableRow.LayoutParams(
+                    0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    0.5f)); //Left half of the whole row
+            labelView.setText(this.label);
+            labelView.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+            labelView.setTextSize(TypedValue.COMPLEX_UNIT_PX, labelSize);
+            labelView.setPadding(0, 0, (int) labelSize / 2, 0);
+
+
+            LinearLayout switchView = new LinearLayout(c);
+            switchView.setLayoutParams(new TableRow.LayoutParams(
+                    0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    0.5f)); //right half of the whole row
+            switchView.setOrientation(LinearLayout.HORIZONTAL);
+            switchView.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+
+            switchView.addView(s);
+            row.addView(labelView);
+            row.addView(switchView);
+
+            rootView = row;
+            ll.addView(rootView);
+        }
+
+        @Override
+        //If triggered, write the data to the output buffers
+        //Always return zero as the analysis process does not receive the values directly
+        protected boolean onMayWriteToBuffers(PhyphoxExperiment experiment) {
+
+            if (inputs == null || outputs == null)
+                return false;
+            if(switchState){
+                outputs.get(0).append(inputs.get(0).getValue());
+            }else {
+                outputs.get(0).append(inputs.get(1).getValue());
+            }
+            return true;
+        }
+
+        @Override
+        //TODO
+        protected String createViewHTML(){
+            return "<div style=\"font-size:"+this.labelSize/.4+"%;\">"+
                     "</div>";
         }
     }
