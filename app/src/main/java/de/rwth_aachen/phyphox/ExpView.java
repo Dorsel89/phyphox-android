@@ -32,6 +32,7 @@ import android.widget.EditText;
 
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.RadioGroup;
 import android.widget.RelativeLayout;
 import android.widget.Spinner;
 import android.widget.TableRow;
@@ -44,7 +45,9 @@ import androidx.appcompat.widget.SwitchCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.ViewCompat;
 
+import com.google.android.material.checkbox.MaterialCheckBox;
 import com.google.android.material.materialswitch.MaterialSwitch;
+import com.google.android.material.radiobutton.MaterialRadioButton;
 import com.google.android.material.resources.MaterialResources;
 import com.google.android.material.slider.LabelFormatter;
 import com.google.android.material.slider.RangeSlider;
@@ -674,12 +677,14 @@ public class ExpView implements Serializable{
         transient Slider s = null;
         private double factor;
         private float defaultValue; //This value is filled into the dataBuffer before the user enters a custom value
-        private float currentValue = Float.NaN; //This value is filled into the dataBuffer before the user enters a custom value
+        private float currentValue = 50f; //This value is filled into the dataBuffer before the user enters a custom value
         private boolean decimal = true; //Is the user allowed to give non-integer values?
         private float min = 0f;
         private float max = 100f;
 
         private float stepSize = 1f;
+
+        private boolean focused = false;
 
         private boolean changeOnRelease = false;
         //private boolean triggered = true;
@@ -702,6 +707,11 @@ public class ExpView implements Serializable{
         protected void setMaxValue(float v) {
             this.max = v;
         }
+
+        protected void setChangeOnRelease(boolean b) {
+            this.changeOnRelease = b;
+        }
+
         private String unit;
 
         protected void setUnit(String unit) {
@@ -762,7 +772,26 @@ public class ExpView implements Serializable{
             s.addOnChangeListener(new Slider.OnChangeListener() {
                 @Override
                 public void onValueChange(@NonNull Slider slider, float value, boolean fromUser) {
-                    getValue();
+                    if(!changeOnRelease){
+                        getValue();
+                    }
+                }
+            });
+            s.addOnSliderTouchListener(new Slider.OnSliderTouchListener(){
+
+                @Override
+                public void onStartTrackingTouch(@NonNull Slider slider) {
+                    if(changeOnRelease){
+                        focused = true;
+                    }
+                }
+
+                @Override
+                public void onStopTrackingTouch(@NonNull Slider slider) {
+                    if(changeOnRelease){
+                        focused=false;
+                        getValue();
+                    }
                 }
             });
         }
@@ -786,14 +815,13 @@ public class ExpView implements Serializable{
             return true;
         }
         @Override
-        //Get the value from the edit box (Note, that we have to divide by the factor to achieve a
+        //Get the value from the slider (Note, that we have to divide by the factor to achieve a
         //use that is consistent with that of the valueElement
         protected double getValue() {
-            if (s == null )
+            if (s == null || focused)
                 return currentValue;
             try {
-                currentValue = (float)s.getValue()/(float)factor;
-
+                    currentValue = (float)s.getValue()/(float)factor;
             } catch (Exception e) {
                 return currentValue;
             }
@@ -814,8 +842,11 @@ public class ExpView implements Serializable{
         protected void onMayReadFromBuffers(PhyphoxExperiment experiment) {
             //Enter value from buffer if it has not been changed by the user
             //This ensures, that the old value is restored if the view has to be created after the views have been switched.
-            double v = experiment.getBuffer(inputs.get(0)).value;
-            setValue((float)v);
+            if(!focused){
+                double v = experiment.getBuffer(inputs.get(0)).value;
+                setValue((float)v);
+            }
+
         }
     }
 
@@ -1543,7 +1574,79 @@ public class ExpView implements Serializable{
                     "</div>";
         }
     }
+    //radioElement implements radio buttons
+    public class radioElement extends expViewElement{
+        private Vector<DataInput> inputs = null;
+        private Vector<DataOutput> outputs = null;
+        private ExpViewFragment parent;
+        protected Vector<String> radio_labels = new Vector<>();
+        //No special constructor.
+        radioElement(String label, String valueOutput, Vector<String> inputs, Resources res) {
+            super(label, valueOutput, inputs, res);
+        }
 
+        protected void setIO(Vector<DataInput> inputs, Vector<DataOutput> outputs) {
+            this.inputs = inputs;
+            this.outputs = outputs;
+        }
+
+        @Override
+        protected String getUpdateMode() {
+            return "inputs";
+        }
+
+        @Override
+        //Create the view in Android and append it to the linear layout
+        protected void createView(LinearLayout ll, Context c, Resources res, ExpViewFragment parent, PhyphoxExperiment experiment){
+            super.createView(ll, c, res, parent, experiment);
+
+
+            //this.parent =parent;
+
+            //The radio group
+            Context myWrapper = new ContextThemeWrapper(c, R.style.Theme_Material3_DayNight_NoActionBar);//Theme_MaterialComponents_DayNight_NoActionBar
+
+            RadioGroup rg = new RadioGroup(myWrapper);
+            List<MaterialRadioButton> radioElements = new ArrayList<>();
+
+            for(int element = 0; element<inputs.size();element++){
+                radioElements.add(new MaterialRadioButton(myWrapper));
+                radioElements.get(element).setText(radio_labels.get(0));
+
+                rg.addView(radioElements.get(element));
+            }
+
+
+            LinearLayout row = new LinearLayout(myWrapper);
+            row.setLayoutParams(new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT));
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setVerticalGravity(Gravity.CENTER_VERTICAL);
+
+            row.addView(rg);
+
+            rootView = row;
+            ll.addView(rootView);
+        }
+
+        @Override
+        //If triggered, write the data to the output buffers
+        //Always return zero as the analysis process does not receive the values directly
+        protected boolean onMayWriteToBuffers(PhyphoxExperiment experiment) {
+
+            if (inputs == null || outputs == null)
+                return false;
+            return true;
+        }
+
+        @Override
+        //TODO
+        protected String createViewHTML(){
+            return "<div style=\"font-size:"+this.labelSize/.4+"%;\">"+
+                    "</div>";
+        }
+    }
     //graphElement implements a graph that displays y vs. x arrays from the dataBuffer
     //This class mostly wraps the graphView, which (being rather complex) is implemented in its own
     //class. See graphView.java...

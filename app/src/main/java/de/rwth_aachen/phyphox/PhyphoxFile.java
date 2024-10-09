@@ -1549,10 +1549,11 @@ public abstract class PhyphoxFile {
                     break;
                 }
                 case "slider": { //The edit element can take input from the user
-                    double defaultValue = getDoubleAttribute("default", 0.);
+                    double defaultValue = getDoubleAttribute("default", 50.);
 
                     double min = getDoubleAttribute("min", 0f);
                     double max = getDoubleAttribute("max", 100f);
+                    boolean changeOnRelease = getBooleanAttribute("changeOnRelease",false);
 
                     //Allowed input/output configuration
                     ioBlockParser.ioMapping[] outputMapping = {
@@ -1566,6 +1567,7 @@ public abstract class PhyphoxFile {
                     is.setMinValue((float)min);
                     is.setMaxValue((float)max);
                     is.setUnit(unit);
+                    is.setChangeOnRelease(changeOnRelease);
                     newView.elements.add(is);
                     break;
                 }
@@ -1585,6 +1587,33 @@ public abstract class PhyphoxFile {
                     se.setIO(inputs, outputs);
 
                     newView.elements.add(se);
+                    break;
+                }
+                case "radio": {
+                    //Allowed input/output configuration
+                    Vector<ioBlockParser.AdditionalTag> ats = new Vector<>();
+                    ioBlockParser.ioMapping[] inputMapping = {
+                            new ioBlockParser.ioMapping() {{name = "input"; asRequired = false; minCount = 1; maxCount = 0; valueAllowed = true; emptyAllowed = true; repeatableOffset = 0;}},
+                    };
+                    ioBlockParser.ioMapping[] outputMapping = {
+                            new ioBlockParser.ioMapping() {{name = "out"; asRequired = false; minCount = 0; maxCount = 0; repeatableOffset = 0;}}
+                    };
+                    //(new ioBlockParser(xpp, experiment, parent, inputs, outputs, inputMapping, outputMapping, null)).process(); //Load inputs and outputs
+                    (new ioBlockParser(xpp,experiment,parent,inputs,outputs,inputMapping,outputMapping,null,ats)).process();
+                    ExpView.radioElement re = newView.new radioElement(label, null, null, parent.getResources()); //This one is user-event driven and does not regularly read or write values
+                    re.setIO(inputs, outputs);
+
+                    for (ioBlockParser.AdditionalTag at : ats){
+                        if (at.name.equals("input")){
+                            try {
+                                re.radio_labels.add(at.attributes.get("label"));
+                                //;
+                            } catch (Exception e) {
+                                throw new phyphoxFileException("Could not parse label of radio element.", xpp.getLineNumber());
+                            }
+                        }
+                    }
+                    newView.elements.add(re);
                     break;
                 }
                 case "rangeslider": { //The edit element can take input from the user
